@@ -1,6 +1,7 @@
-let VIDEO = null;
 let CANVAS = null;
 let CONTEXT = null;
+let HELPER_CANVAS = null;
+let HELPER_CONTEXT = null;
 let SCALER = 0.8;
 let SIZE = { x: 0, y: 0, width: 0, height: 0, rows: 3, columns: 3 };
 let PIECES = [];
@@ -14,12 +15,16 @@ function main() {
   CANVAS = document.querySelector("#myCanvas");
   CONTEXT = CANVAS.getContext("2d");
 
+  HELPER_CANVAS = document.querySelector("#helperCanvas");
+  HELPER_CONTEXT = HELPER_CANVAS.getContext("2d");
+
   addEventListeners();
 
   (function () {
     handleResize();
-    // window.addEventListener ('resize', handleResize);
+    window.addEventListener("resize", handleResize);
     initializePieces(SIZE.rows, SIZE.columns);
+    randomizePiece();
     updateCanvas();
   })();
 
@@ -62,8 +67,14 @@ function onTouchEnd() {
 }
 
 function onMouseDown(evt) {
-  SELECTED_PIECE = getPressPiece(evt);
-  if (SELECTED_PIECE != null) {
+  const imgData = HELPER_CONTEXT.getImageData(evt.x, evt.y, 1, 1);
+  if (imgData.data[3] == 0) {
+    return;
+  }
+  const clickedColor = `rgb(${imgData.data[0]}, ${imgData.data[1]}, ${imgData.data[2]})`;
+  SELECTED_PIECE = getPressedPieceByColor(evt, clickedColor);
+  //   SELECTED_PIECE = getPressPiece(evt);
+  if (SELECTED_PIECE != null && !SELECTED_PIECE.correct) {
     const index = PIECES.indexOf(SELECTED_PIECE);
     if (index > -1) {
       PIECES.splice(index, 1);
@@ -77,7 +88,7 @@ function onMouseDown(evt) {
 }
 
 function onMouseMove(evt) {
-  if (SELECTED_PIECE != null) {
+  if (SELECTED_PIECE != null && !SELECTED_PIECE.correct) {
     SELECTED_PIECE.x = evt.x - SELECTED_PIECE.offset.x;
     SELECTED_PIECE.y = evt.y - SELECTED_PIECE.offset.y;
   }
@@ -106,9 +117,21 @@ function getPressPiece(loc) {
   return null;
 }
 
+function getPressedPieceByColor(loc, color) {
+  for (let i = PIECES.length - 1; i >= 0; i--) {
+    if (PIECES[i].color == color) {
+      return PIECES[i];
+    }
+  }
+  return null;
+}
+
 function handleResize() {
   CANVAS.width = window.innerWidth;
   CANVAS.height = window.innerHeight;
+
+  HELPER_CANVAS.width = window.innerWidth;
+  HELPER_CANVAS.height = window.innerHeight;
 
   let resizer =
     SCALER *
@@ -120,10 +143,14 @@ function handleResize() {
   SIZE.height = resizer * image.height;
   SIZE.x = window.innerWidth / 2 - SIZE.width / 2;
   SIZE.y = window.innerHeight / 2 - SIZE.height / 2;
+
+  initializePieces(SIZE.rows, SIZE.columns);
+  randomizePiece();
 }
 
 function updateCanvas() {
   CONTEXT.clearRect(0, 0, CANVAS.width, CANVAS.height);
+  HELPER_CONTEXT.clearRect(0, 0, CANVAS.width, CANVAS.height);
 
   CONTEXT.globalAlpha = 0.5;
 
@@ -133,6 +160,7 @@ function updateCanvas() {
 
   for (let i = 0; i < PIECES.length; i++) {
     PIECES[i].draw(CONTEXT);
+    PIECES[i].draw(HELPER_CONTEXT, false);
   }
   window.requestAnimationFrame(updateCanvas);
 }
@@ -141,9 +169,14 @@ function initializePieces(rows, cols) {
   SIZE.rows = rows;
   SIZE.columns = cols;
   PIECES = [];
+  const uniqueRandomColors = [];
   for (let i = 0; i < SIZE.rows; i++) {
     for (let j = 0; j < SIZE.columns; j++) {
-      PIECES.push(new Piece(i, j));
+      const color = getRandomColor();
+      while (uniqueRandomColors.includes(color)) {
+        color = getRandomColor();
+      }
+      PIECES.push(new Piece(i, j, color));
     }
   }
 
@@ -194,7 +227,7 @@ function randomizePiece() {
 }
 
 class Piece {
-  constructor(rowIndex, colIndex) {
+  constructor(rowIndex, colIndex, color) {
     this.rowIndex = rowIndex;
     this.colIndex = colIndex;
     this.x = SIZE.x + (SIZE.width * this.colIndex) / SIZE.columns;
@@ -203,8 +236,10 @@ class Piece {
     this.height = SIZE.height / SIZE.rows;
     this.xCorrect = this.x;
     this.yCorrect = this.y;
+    this.correct = false;
+    this.color = color;
   }
-  draw(context) {
+  draw(context, useImg = true) {
     context.beginPath();
 
     const sz = Math.min(this.width, this.height);
@@ -328,17 +363,27 @@ class Piece {
         tabHeight) /
       sz;
 
-    context.drawImage(
-      image,
-      (this.colIndex * image.width) / SIZE.columns - scaledTabHeight,
-      (this.rowIndex * image.height) / SIZE.rows - scaledTabHeight,
-      image.width / SIZE.columns + scaledTabHeight * 2,
-      image.height / SIZE.rows + scaledTabHeight * 2,
-      this.x - tabHeight,
-      this.y - tabHeight,
-      this.width + tabHeight * 2,
-      this.height + tabHeight * 2
-    );
+    if (useImg) {
+      context.drawImage(
+        image,
+        (this.colIndex * image.width) / SIZE.columns - scaledTabHeight,
+        (this.rowIndex * image.height) / SIZE.rows - scaledTabHeight,
+        image.width / SIZE.columns + scaledTabHeight * 2,
+        image.height / SIZE.rows + scaledTabHeight * 2,
+        this.x - tabHeight,
+        this.y - tabHeight,
+        this.width + tabHeight * 2,
+        this.height + tabHeight * 2
+      );
+    } else {
+      context.fillStyle = this.color;
+      context.fillRect(
+        this.x - tabHeight,
+        this.y - tabHeight,
+        this.width + tabHeight * 2,
+        this.height * tabHeight * 2
+      );
+    }
 
     context.restore();
 
@@ -360,6 +405,8 @@ class Piece {
   snap() {
     this.x = this.xCorrect;
     this.y = this.yCorrect;
+
+    this.correct = true;
   }
 }
 
@@ -367,4 +414,11 @@ function distance(p1, p2) {
   return Math.sqrt(
     (p1.x - p2.x) * (p1.x - p2.x) + (p1.y - p2.y) * (p1.y - p2.y)
   );
+}
+
+function getRandomColor() {
+  const red = Math.floor(Math.random() * 255);
+  const green = Math.floor(Math.random() * 255);
+  const blue = Math.floor(Math.random() * 255);
+  return `rgb(${red}, ${green}, ${blue})`;
 }
