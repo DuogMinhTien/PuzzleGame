@@ -407,6 +407,12 @@ class Piece {
     this.y = this.yCorrect;
 
     this.correct = true;
+
+    const index = PIECES.indexOf(SELECTED_PIECE);
+    if (index > -1) {
+      PIECES.splice(index, 1);
+      PIECES.unshift(SELECTED_PIECE);
+    }
   }
 }
 
