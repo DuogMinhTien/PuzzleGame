@@ -1,18 +1,16 @@
 * {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
 body {
-    min-height: 200vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overscroll-behavior: none;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overscroll-behavior: none;
 }
 
 canvas {
-
 }
